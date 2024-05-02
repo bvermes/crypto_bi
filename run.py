@@ -40,6 +40,7 @@ def menu():
         elif choice == "4":
             open_powerbi_dashboard()
         elif choice == "5":
+            month = input("Please write the month(example: 2023/12):")
             rate = input("Please write the unemployment_rate(example: 3.4):")
             new_unemployment_rate(month, rate)
         elif choice == "6":
