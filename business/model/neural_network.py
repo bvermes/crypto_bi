@@ -5,9 +5,94 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers, activations
-from keras.callbacks import EarlyStopping, ModelCheckpoint
+from keras import layers, activations
+from keras import callbacks
+import joblib
+
 
 
 class NeuralNetwork:
-    pass
+    def __init__(self, df):
+        self.df = df
+        self.scaler = StandardScaler()
+        self.model = None
+        self.scaler_path = "scaler.pkl"  
+        self.model_path = "model.h5"  
+        
+    def _process_Xy(self, raw_X: np.array, raw_y: np.array, lookback: int) -> np.array:
+        X = np.empty(shape=(raw_X.shape[0] - lookback, lookback , raw_X.shape[1]), dtype=np.float32)
+        y = np.empty(shape=(raw_y.shape[0] - lookback), dtype=np.float32)
+
+        target_index = 0
+        for i in range(lookback, raw_X.shape[0]):
+            X[target_index] = raw_X[i - lookback : i]
+            y[target_index] = raw_y[i]
+            target_index += 1
+
+        return X.copy(), y.copy()
+        
+    def run_model(self):
+        self.df.set_index('datetime', inplace=True)
+        self.df["Day.Of.Year.X"], self.df["Day.Of.Year.Y"] = \
+        np.sin(2 * np.pi * self.df.index.day_of_year / 365), 
+        np.cos(2 * np.pi * self.df.index.day_of_year / 365)
+        self.df = self.df.drop(["low", "close", "volume"], axis=1)
+                
+        train_split_index = int(len(self.df) * 0.7)   # 70% for training
+        val_split_index = int(len(self.df) * 0.85)    # 15% for validation
+        test_split_index = len(self.df)               # Remaining 15% for testing
+
+        # Step 2: Split the DataFrame
+        train_df = self.df.iloc[:train_split_index]   # Training set
+        valid_df = self.df.iloc[train_split_index:val_split_index]   # Validation set
+        test_df = self.df.iloc[val_split_index:test_split_index] 
+        
+        scaler_input = StandardScaler()
+        scaler_output = StandardScaler()
+        scaled_train = scaler_input.fit_transform(train_df)
+        target_train = scaler_output.fit_transform(train_df[["high"]])
+        scaled_valid = scaler_input.transform(valid_df)
+        target_valid = scaler_output.transform(valid_df[["First.Time.Visits"]])
+        scaled_test = scaler_input.transform(test_df)
+        target_test = scaler_output.transform(test_df[["high"]])
+        
+        lookback = 10
+        train_X, train_y = self._process_Xy(scaled_train, target_train, lookback=lookback)
+        test_X, test_y = self._process_Xy(scaled_test, target_test, lookback=lookback)
+        valid_X, valid_y = self._process_Xy(scaled_valid, target_valid, lookback=lookback)
+        
+        model = keras.Sequential(
+            [
+                layers.LSTM(16, activation="relu", input_shape = train_X.shape[1:]),
+                layers.Dense(1),
+            ]
+        )
+        model.compile(loss='MeanSquaredError', optimizer='Adam')
+        callbacks = [callbacks.EarlyStopping(monitor="val_loss", patience=10)]
+        history = model.fit(
+            train_X,
+            train_y,
+            validation_data=(valid_X, valid_y),
+            batch_size=16,
+            epochs=100,
+            callbacks=callbacks,
+            shuffle=True,
+            verbose=True,
+        )
+        
+        # Save the trained model and scaler
+        joblib.dump(self.scaler, self.scaler_path)
+        model.save(self.model_path)
+        return model
+    
+    def load_model(scaler_path, model_path):
+        scaler = joblib.load(scaler_path)
+        model = keras.models.load_model(model_path)
+        return scaler, model
+
+
+if __name__ == "__main__":
+    df = pd.read_csv("data.csv")
+    neural_net = NeuralNetwork(df)
+    trained_model = neural_net.run_model()
+    loaded_scaler, loaded_model = NeuralNetwork.load_model("scaler.pkl", "model.h5")

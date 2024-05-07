@@ -1,15 +1,27 @@
 from tvDatafeed import TvDatafeed, Interval
-
-
+# intervals
+""" 
+    in_1_minute = "1"
+    in_3_minute = "3"
+    in_5_minute = "5"
+    in_15_minute = "15"
+    in_30_minute = "30"
+    in_45_minute = "45"
+    in_1_hour = "1H"
+    in_2_hour = "2H"
+    in_3_hour = "3H"
+    in_4_hour = "4H"
+    in_daily = "1D"
+    in_weekly = "1W"
+    in_monthly = "1M" 
+    """
+    
 def get_data(symbol, exchange, interval, n_bars):
     tv = TvDatafeed()
-    # index
-    print("f")
     nifty_index_data = tv.get_hist(
         symbol=symbol, exchange=exchange, interval=interval, n_bars=n_bars
     )
-    # futures continuous contract
-    print(nifty_index_data.tail())
+    return nifty_index_data
     # crudeoil
     # crudeoil_data = tv.get_hist(symbol='CRUDEOIL',exchange='MCX',interval=Interval.in_1_hour,n_bars=5000,fut_contract=1)
     # downloading data for extended market hours

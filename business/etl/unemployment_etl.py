@@ -38,9 +38,7 @@ def fill_null_with_average(df):
 
     return df
 
-
-if __name__ == "__main__":
-
+def run_etl():
     table_name = "unemployment_rates"
     columns = ["date DATE null", "overall_rate numeric(20, 2) NOT null"]
     csv_file = os.path.join(
@@ -53,3 +51,7 @@ if __name__ == "__main__":
 
     create_table_if_not_exists(table_name, columns)
     etl_load_dataframe_to_database(df, table_name)
+    
+if __name__ == "__main__":
+    run_etl()
+    
