@@ -41,7 +41,7 @@ def remove_pair(pair, exchange):
     except:
         print(f"Table {pair}_weekly doesn't exist. Maybe it was already deleted or wasn't added yet.")
         
-    delete_data_from_table("symbols", f"pair = {pair}")
+    delete_data_from_table("symbols", f"pair = '{pair}'")
     return
 
 def refresh_all_data():
