@@ -14,9 +14,11 @@ import joblib
 class NeuralNetwork:
     def __init__(self, df):
         self.df = df
-        self.scaler = StandardScaler()
+        self.scaler_input = None
+        self.scaler_output = None
         self.model = None
-        self.scaler_path = "scaler.pkl"  
+        self.scaler_input_path = "scaler_input.pkl" 
+        self.scaler_output_path = "scaler_output.pkl"
         self.model_path = "model.h5"  
         
     def _process_Xy(self, raw_X: np.array, raw_y: np.array, lookback: int) -> np.array:
@@ -31,7 +33,7 @@ class NeuralNetwork:
 
         return X.copy(), y.copy()
         
-    def run_model(self):
+    def fit_model(self):
         self.df.set_index('datetime', inplace=True)
         self.df["Day.Of.Year.X"], self.df["Day.Of.Year.Y"] = \
         np.sin(2 * np.pi * self.df.index.day_of_year / 365), 
@@ -79,10 +81,36 @@ class NeuralNetwork:
             shuffle=True,
             verbose=True,
         )
+        plt.plot(history.history['loss'], label='Training Loss')
+        plt.plot(history.history['val_loss'], label='Validation Loss')
+        plt.title('Model Training and Validation Loss')
+        plt.xlabel('Epochs')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.savefig('loss_plot.png')
+        
+        pred = model.predict(test_X)
+        plt.figure(figsize=(10, 6))
+        plt.plot(test_df["First.Time.Visits"], label="Real", color='blue')
+        plt.plot(pd.DataFrame(index=test_df.index[lookback:], data=scaler_output.inverse_transform(pred)), label="Predicted", color='red')
+        plt.xticks(rotation=45)
+        plt.title('Actual vs Predicted First Time Visits')
+        plt.xlabel('Date')
+        plt.ylabel('First Time Visits')
+        plt.legend()
+        plt.savefig('prediction_plot.png')
         
         # Save the trained model and scaler
-        joblib.dump(self.scaler, self.scaler_path)
+
+        
+        self.scaler_input = scaler_input
+        self.scaler_output = scaler_output
+        self.model = model
+        
         model.save(self.model_path)
+        joblib.dump(self.scaler_input, self.scaler_input_path)
+        joblib.dump(self.scaler_output, self.scaler_output_path)
+        
         return model
     
     def load_model(scaler_path, model_path):
@@ -94,5 +122,5 @@ class NeuralNetwork:
 if __name__ == "__main__":
     df = pd.read_csv("data.csv")
     neural_net = NeuralNetwork(df)
-    trained_model = neural_net.run_model()
+    trained_model = neural_net.fit_model()
     loaded_scaler, loaded_model = NeuralNetwork.load_model("scaler.pkl", "model.h5")

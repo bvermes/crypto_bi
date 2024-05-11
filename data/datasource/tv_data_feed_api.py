@@ -1,5 +1,12 @@
 from tvDatafeed import TvDatafeed, Interval
-# intervals
+from dotenv import load_dotenv
+import os
+load_dotenv()
+username = os.environ.get('TV_USERNAME')
+password = os.environ.get('TV_PASSWORD')
+tv = TvDatafeed(username, password)
+#
+
 """ 
     in_1_minute = "1"
     in_3_minute = "3"
@@ -17,15 +24,10 @@ from tvDatafeed import TvDatafeed, Interval
     """
     
 def get_data(symbol, exchange, interval, n_bars):
-    tv = TvDatafeed()
     nifty_index_data = tv.get_hist(
         symbol=symbol, exchange=exchange, interval=interval, n_bars=n_bars
     )
     return nifty_index_data
-    # crudeoil
-    # crudeoil_data = tv.get_hist(symbol='CRUDEOIL',exchange='MCX',interval=Interval.in_1_hour,n_bars=5000,fut_contract=1)
-    # downloading data for extended market hours
-    # extended_price_data = tv.get_hist(symbol="EICHERMOT",exchange="NSE",interval=Interval.in_1_hour,n_bars=500, extended_session=False)
 
 
 if __name__ == "__main__":

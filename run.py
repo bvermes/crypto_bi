@@ -1,3 +1,9 @@
+import sys
+sys.path.append('../CRYPTO_BI')
+import schedule
+import time 
+import threading
+
 from business.utils.functions import (
     add_new_pair,
     remove_pair,
@@ -6,6 +12,13 @@ from business.utils.functions import (
     new_unemployment_rate,
     rerun_models,
 )
+
+schedule.every(1).minutes.do(refresh_all_data)
+def run_scheduler():
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
 
 
 def menu():
@@ -45,9 +58,11 @@ def menu():
             new_unemployment_rate(month, rate)
         elif choice == "6":
             refresh_all_data()
-            rerun_models()
+            pair = input("What pair do you want to use to traing the model? (example: BTCUSDT):")
+            rerun_models(pair)
             pass
         elif choice.upper() == "Q":
+            print("Program closing. Goodbye!")
             quit_menu = True
         else:
             print("Invalid choice. Please enter a number from 1 to 6, or Q to quit.")
@@ -55,4 +70,6 @@ def menu():
 
 if __name__ == "__main__":
     refresh_all_data()
+    #etl_thread = threading.Thread(target=run_scheduler)
+    #etl_thread.start()
     menu()

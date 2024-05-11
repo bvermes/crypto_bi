@@ -11,8 +11,10 @@ sys.path.append(grandparent_dir)
 
 
 from business.utils.db_util import (
-    create_table_if_not_exists,
-    etl_load_dataframe_to_database,
+    create_table,
+    load_dataframe_to_database,
+    select_from_table,
+    check_table_existance
 )
 
 
@@ -49,8 +51,9 @@ def run_etl():
 
     df = fill_null_with_average(df)
 
-    create_table_if_not_exists(table_name, columns)
-    etl_load_dataframe_to_database(df, table_name)
+    if (check_table_existance(table_name=table_name) == False):
+            create_table(table_name, columns)
+    load_dataframe_to_database(df, table_name)
     
 if __name__ == "__main__":
     run_etl()
