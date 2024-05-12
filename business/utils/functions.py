@@ -6,6 +6,8 @@ from business.etl.tv_data_hourly_etl import run_etl as hourly_etl
 from business.etl.tv_data_daily_etl import run_etl as daily_etl
 from business.etl.tv_data_weekly_etl import run_etl as weekly_etl
 import pandas as pd
+import numpy as np
+from datetime import datetime
 from business.model.neural_network import NeuralNetwork
 
 
@@ -61,13 +63,20 @@ def open_powerbi_dashboard():
 
 
 def new_unemployment_rate(month, rate):
-    rows = select_from_table("unemployment_rates", f"date = {month}")
+    date_str = f"{month}-01"
+    date = datetime.strptime(date_str, "%Y-%m-%d")
+    formatted_date = date.strftime("%Y-%m-%d")
+    formatted_date = f"'{formatted_date}'"
+    rows = select_from_table("unemployment_rates", f"date = {formatted_date}")
     if (len(rows) > 0):
         print("Data already exists for this month. Updating the rate.")
         try:
-            update_data_in_db("unemployment_rates", f"overall_rate = {rate}", f"date = {month}")
+            update_data_in_db("unemployment_rates", f"overall_rate = {rate}", f"date = {formatted_date}")
         except:
             print("Error updating the data.")
+    else:
+        print("Data doesn't exist for this month. Inserting new data.")
+        insert_data_to_table("unemployment_rates", pd.DataFrame(data=[[formatted_date, rate]], columns=["date", "overall_rate"]))
     return
 
 def rerun_models(pair):

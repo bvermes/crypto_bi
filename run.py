@@ -53,11 +53,11 @@ def menu():
         elif choice == "4":
             open_powerbi_dashboard()
         elif choice == "5":
-            month = input("Please write the month(example: 2023/12):")
+            month = input("Please write the month(example: 2024-02):")
             rate = input("Please write the unemployment_rate(example: 3.4):")
             new_unemployment_rate(month, rate)
         elif choice == "6":
-            refresh_all_data()
+            # refresh_all_data()
             pair = input("What pair do you want to use to traing the model? (example: BTCUSDT):")
             rerun_models(pair)
             pass
@@ -69,7 +69,7 @@ def menu():
 
 
 if __name__ == "__main__":
-    refresh_all_data()
+    #refresh_all_data()
     #etl_thread = threading.Thread(target=run_scheduler)
     #etl_thread.start()
     menu()

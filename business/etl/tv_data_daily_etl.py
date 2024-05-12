@@ -30,7 +30,7 @@ def _fill_null_with_average(df):
 def _load_dataframe_to_database(df, table_name):
     db_df = select_from_table(table_name=table_name, where_condition="TRUE")
     merged = df.merge(db_df, on='datetime', how='left', indicator=True, suffixes=('', '_db') )
-    only_in_df = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge','open_db', 'high_db', 'low_db', 'close_db', 'volume_db'])
+    only_in_df = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge','open_db', 'high_db', 'low_db', 'close_db', 'volume_db', 'date_db', 'week_db', 'month_db'])
     load_dataframe_to_database(only_in_df, table_name)
 
 
@@ -41,9 +41,17 @@ def run_etl(daily_df, symbol):
                "high numeric(20, 2) NOT null",
                "low numeric(20, 2) NOT null", 
                "close numeric(20, 2) NOT null",
-               "volume numeric(20, 2) NOT null"]
+               "volume numeric(20, 2) NOT null", 
+               "date DATE null",
+               "week date null",
+               "month date null",]
     df = daily_df
     df = df[["open", "high", "low", "close", "volume"]].reset_index()
+    
+    df['date'] = df['datetime'].dt.normalize()
+    df['week'] = df['datetime'] - pd.to_timedelta(df['datetime'].dt.dayofweek, unit='d')
+    df['month'] = df['datetime'] - pd.offsets.MonthBegin(1)
+
     
     df = _fill_null_with_average(df)
     if (check_table_existance(table_name=table_name) == False):

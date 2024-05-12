@@ -125,7 +125,7 @@ def update_data_in_db(self, table_name, set_values, where_condition):
         cursor = conn.cursor()
         update_query = f"""
         UPDATE {table_name}
-        SET 
+        SET {set_values}
         WHERE {where_condition}
         """
         self.__update_data(conn, table_name, where_condition=where_condition)

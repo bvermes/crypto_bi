@@ -35,10 +35,10 @@ class NeuralNetwork:
         
     def fit_model(self):
         self.df.set_index('datetime', inplace=True)
-        self.df["Day.Of.Year.X"], self.df["Day.Of.Year.Y"] = \
-        np.sin(2 * np.pi * self.df.index.day_of_year / 365), 
-        np.cos(2 * np.pi * self.df.index.day_of_year / 365)
-        self.df = self.df.drop(["low", "close", "volume"], axis=1)
+        self.df["Day.Of.Year.X"] = np.sin(2 * np.pi * self.df.index.day_of_year / 365)
+        self.df["Day.Of.Year.Y"] = np.cos(2 * np.pi * self.df.index.day_of_year / 365)
+        # self.df = self.df.drop(["low", "close", "volume"], axis=1)
+        self.df = self.df.drop(["date", 'week', 'month'], axis=1)
                 
         train_split_index = int(len(self.df) * 0.7)   # 70% for training
         val_split_index = int(len(self.df) * 0.85)    # 15% for validation
@@ -54,7 +54,7 @@ class NeuralNetwork:
         scaled_train = scaler_input.fit_transform(train_df)
         target_train = scaler_output.fit_transform(train_df[["high"]])
         scaled_valid = scaler_input.transform(valid_df)
-        target_valid = scaler_output.transform(valid_df[["First.Time.Visits"]])
+        target_valid = scaler_output.transform(valid_df[["high"]])
         scaled_test = scaler_input.transform(test_df)
         target_test = scaler_output.transform(test_df[["high"]])
         
@@ -70,14 +70,14 @@ class NeuralNetwork:
             ]
         )
         model.compile(loss='MeanSquaredError', optimizer='Adam')
-        callbacks = [callbacks.EarlyStopping(monitor="val_loss", patience=10)]
+        callbacks_value = [callbacks.EarlyStopping(monitor="val_loss", patience=10)]
         history = model.fit(
             train_X,
             train_y,
             validation_data=(valid_X, valid_y),
             batch_size=16,
             epochs=100,
-            callbacks=callbacks,
+            callbacks=callbacks_value,
             shuffle=True,
             verbose=True,
         )
@@ -91,12 +91,12 @@ class NeuralNetwork:
         
         pred = model.predict(test_X)
         plt.figure(figsize=(10, 6))
-        plt.plot(test_df["First.Time.Visits"], label="Real", color='blue')
+        plt.plot(test_df["high"], label="Real", color='blue')
         plt.plot(pd.DataFrame(index=test_df.index[lookback:], data=scaler_output.inverse_transform(pred)), label="Predicted", color='red')
         plt.xticks(rotation=45)
-        plt.title('Actual vs Predicted First Time Visits')
+        plt.title('Actual vs Predicted high')
         plt.xlabel('Date')
-        plt.ylabel('First Time Visits')
+        plt.ylabel('high')
         plt.legend()
         plt.savefig('prediction_plot.png')
         
