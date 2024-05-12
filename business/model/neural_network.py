@@ -34,12 +34,32 @@ class NeuralNetwork:
         return X.copy(), y.copy()
         
     def fit_model(self):
+        plt.figure(figsize=(14, 6))
+        plt.plot(self.df.index, self.df['high'], label='High')
+        plt.plot(self.df.index, self.df['low'], label='Low')
+        plt.plot(self.df.index, self.df['open'], label='Open')
+        plt.plot(self.df.index, self.df['close'], label='Close')
+        plt.title('Time Series - BTC Prices')
+        plt.legend()
+        plt.savefig('btc_prices.png')
+        
+
         self.df.set_index('datetime', inplace=True)
         self.df["Day.Of.Year.X"] = np.sin(2 * np.pi * self.df.index.day_of_year / 365)
         self.df["Day.Of.Year.Y"] = np.cos(2 * np.pi * self.df.index.day_of_year / 365)
         # self.df = self.df.drop(["low", "close", "volume"], axis=1)
         self.df = self.df.drop(["date", 'week', 'month'], axis=1)
-                
+        
+        plt.figure(figsize=(6, 6))
+        plt.scatter(self.df['Day.Of.Year.X'], self.df['Day.Of.Year.Y'], c=self.df['high'])
+        plt.colorbar(label='High Price')
+        plt.title('Seasonal Effects on High Prices')
+        plt.xlabel('Day.Of.Year.X')
+        plt.ylabel('Day.Of.Year.Y')
+        plt.savefig('seasonal_effects.png')
+        
+
+        
         train_split_index = int(len(self.df) * 0.7)   # 70% for training
         val_split_index = int(len(self.df) * 0.85)    # 15% for validation
         test_split_index = len(self.df)               # Remaining 15% for testing

@@ -70,6 +70,6 @@ def menu():
 
 if __name__ == "__main__":
     #refresh_all_data()
-    #etl_thread = threading.Thread(target=run_scheduler)
-    #etl_thread.start()
+    etl_thread = threading.Thread(target=run_scheduler)
+    etl_thread.start()
     menu()
