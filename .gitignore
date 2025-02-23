@@ -334,3 +334,7 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/python,flask,macos,windows,linux
+
+
+data/exports/*
+log.xlsx
