@@ -1,4 +1,4 @@
-import trading_indicators as ti
+import business.utils.trading_indicators as ti
 import pandas as pd
 
 
