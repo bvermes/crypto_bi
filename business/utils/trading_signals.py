@@ -4,8 +4,8 @@ import pandas as pd
 
 def very_low_price(symbol, df, last_valid_row):
     """Check if the price is very low based on signal, RSI, and price change conditions."""
-    last_close = df.iloc[-1]["close"]
-    first_close = df.iloc[0]["close"]
+    first_close = float(df.iloc[0]["close"])
+    last_close = float(df.iloc[-1]["close"])
     time_diff = (df.iloc[-1]["timestamp"] - df.iloc[0]["timestamp"]).days
     price_change = abs((last_close - first_close) / first_close)
 
@@ -35,8 +35,8 @@ def very_low_price(symbol, df, last_valid_row):
 
 def very_high_price(symbol, df, last_valid_row):
     """Check if the price is very high based on signal, RSI, and price change conditions."""
-    last_close = df.iloc[-1]["close"]
-    first_close = df.iloc[0]["close"]
+    first_close = float(df.iloc[0]["close"])
+    last_close = float(df.iloc[-1]["close"])
     time_diff = (df.iloc[-1]["timestamp"] - df.iloc[0]["timestamp"]).days
     price_change = abs((last_close - first_close) / first_close)
 
