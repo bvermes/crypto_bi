@@ -244,49 +244,166 @@ def find_swings(df, high_col="high", low_col="low", window=5):
     return df
 
 
-def calculate_fibonacci_from_swings(df, high_col="high", low_col="low", window=5):
-    """Calculate Fibonacci retracement levels and store them in the DataFrame."""
-    df = find_swings(df, high_col, low_col, window)
+def calculate_fibonacci_from_swings(df, high_col="high", low_col="low", suffix=""):
+    """Calculate Fibonacci retracement levels iteratively across the entire DataFrame.
 
-    recent_high_idx = df[df["swing_high"]].index.max()
-    recent_low_idx = df[df["swing_low"]].index.max()
+    This function iterates row by row, ensuring that Fibonacci levels update dynamically.
 
-    if pd.isna(recent_high_idx) or pd.isna(recent_low_idx):
-        print("Not enough swing points for Fibonacci calculation.")
-        return df
+    Parameters:
+    - df: DataFrame containing price data.
+    - high_col: Column name for high prices.
+    - low_col: Column name for low prices.
+    - suffix: A string to append to Fibonacci level column names (for multi-timeframe tracking).
 
-    # Determine trend direction
-    if recent_high_idx > recent_low_idx:
-        swing_high = df.loc[recent_high_idx, high_col]
-        swing_low = df.loc[recent_low_idx, low_col]
-        trend = "Uptrend"
-    else:
-        swing_high = df.loc[recent_high_idx, high_col]
-        swing_low = df.loc[recent_low_idx, low_col]
-        trend = "Downtrend"
+    Returns:
+    - DataFrame with Fibonacci levels assigned per row.
+    """
 
-    price_range = swing_high - swing_low
+    def find_local_low(df, current_idx, lookback=40, check_range=10):
+        """Find the lowest low within a lookback period and return the surrounding confirmed local low."""
+        start_idx = max(0, current_idx - lookback)
 
-    # Calculate Fibonacci levels and store them as columns
-    fib_levels = {
-        "fib_100": swing_high,
-        "fib_78_6": swing_high - 0.786 * price_range,
-        "fib_61_8": swing_high - 0.618 * price_range,
-        "fib_50": swing_high - 0.5 * price_range,
-        "fib_38_2": swing_high - 0.382 * price_range,
-        "fib_23_6": swing_high - 0.236 * price_range,
-        "fib_0": swing_low,
-        "swing_high_val": swing_high,
-        "swing_low_val": swing_low,
-        "trend": trend,
+        # Ensure the slice is not empty
+        if start_idx >= current_idx:
+            return None  # No valid range to search in
+
+        low_values = df[low_col][start_idx:current_idx]
+
+        if low_values.empty:
+            return None  # No valid values to search in
+
+        low_idx = low_values.idxmin()
+
+        # Check the surrounding range to see if it's truly the lowest nearby
+        check_start = max(0, low_idx - check_range)
+        check_end = min(len(df), low_idx + check_range)
+
+        if df[low_col].loc[low_idx] == df[low_col].loc[check_start:check_end].min():
+            return low_idx
+        else:
+            # If it's not the lowest, move back slightly and search again
+            return find_local_low(df, low_idx, lookback=10, check_range=check_range)
+
+    def find_local_high(df, low_idx, current_idx, prev_high_idx=None):
+        """Find the highest high between low_idx and current_idx.
+        If the high is the last row, use the previous valid local high.
+        """
+        # Ensure a valid range exists
+        if low_idx >= current_idx:
+            return prev_high_idx  # No valid range, return previous high if available
+
+        high_values = df[high_col][low_idx:current_idx]
+
+        if high_values.empty:
+            return prev_high_idx  # No valid values, return previous high
+
+        high_idx = high_values.idxmax()
+
+        # If the detected high is the last row, revert to previous valid high
+        if high_idx == df.index[-1]:
+            return (
+                prev_high_idx if prev_high_idx is not None else high_idx
+            )  # Use previous high if available
+
+        return high_idx
+
+    fib_columns = {
+        "fib_261_8": None,
+        "fib_161_8": None,
+        "fib_100": None,
+        "fib_78_6": None,
+        "fib_61_8": None,
+        "fib_50": None,
+        "fib_38_2": None,
+        "fib_23_6": None,
+        "fib_0": None,
+        "swing_high_val": None,
+        "swing_low_val": None,
+        "trend": None,
     }
 
-    # Add Fibonacci levels to the DataFrame for the range between swings
-    min_idx = min(recent_high_idx, recent_low_idx)
-    max_idx = max(recent_high_idx, recent_low_idx)
+    # Add suffix to Fibonacci level column names
+    fib_columns = {key + suffix: None for key in fib_columns}
+    df = df.assign(**{col: np.nan for col in fib_columns.keys()})
 
-    for level, value in fib_levels.items():
-        df[level] = np.nan
-        df.loc[min_idx:max_idx, level] = value
+    prev_fib_levels = None  # Store the last known Fibonacci levels
 
+    for current_idx in df.index:
+        # Find local low and high
+        recent_low_idx = find_local_low(df, current_idx, lookback=40, check_range=10)
+        if recent_low_idx is None:
+            continue  # Skip if no valid low is found
+
+        recent_high_idx = find_local_high(df, recent_low_idx, current_idx)
+
+        # If high is the last row, use the previous valid Fibonacci levels
+        if recent_high_idx == df.index[-1]:
+            if prev_fib_levels:
+                df.loc[current_idx, list(prev_fib_levels.keys())] = list(
+                    prev_fib_levels.values()
+                )
+            continue
+
+        # Check for deeper lows and adjust
+        for extended_lookback, threshold in [(40, 0.3), (80, 1)]:
+            deeper_low_idx = find_local_low(
+                df, recent_low_idx, lookback=extended_lookback, check_range=10
+            )
+            if (
+                deeper_low_idx
+                and df.loc[recent_low_idx, low_col] - df.loc[deeper_low_idx, low_col]
+                > (df.loc[recent_high_idx, high_col] - df.loc[recent_low_idx, low_col])
+                * threshold
+            ):
+                recent_low_idx = deeper_low_idx
+                recent_high_idx = find_local_high(df, recent_low_idx, current_idx)
+
+        swing_low = df.loc[recent_low_idx, low_col]
+        swing_high = df.loc[recent_high_idx, high_col]
+        price_range = swing_high - swing_low
+
+        # If no valid retracement range, skip
+        if price_range == 0:
+            continue
+
+        # Calculate Fibonacci levels
+        is_uptrend = recent_high_idx > recent_low_idx
+
+        if is_uptrend:
+            fib_levels = {
+                f"fib_261_8{suffix}": swing_low + 2.618 * price_range,
+                f"fib_161_8{suffix}": swing_low + 1.618 * price_range,
+                f"fib_100{suffix}": swing_high,
+                f"fib_78_6{suffix}": swing_low + 0.786 * price_range,
+                f"fib_61_8{suffix}": swing_low + 0.618 * price_range,
+                f"fib_50{suffix}": swing_low + 0.5 * price_range,
+                f"fib_38_2{suffix}": swing_low + 0.382 * price_range,
+                f"fib_23_6{suffix}": swing_low + 0.236 * price_range,
+                f"fib_0{suffix}": swing_low,
+            }
+        else:  # Downtrend case
+            fib_levels = {
+                f"fib_261_8{suffix}": swing_high - 2.618 * price_range,
+                f"fib_161_8{suffix}": swing_high - 1.618 * price_range,
+                f"fib_100{suffix}": swing_low,
+                f"fib_78_6{suffix}": swing_high - 0.786 * price_range,
+                f"fib_61_8{suffix}": swing_high - 0.618 * price_range,
+                f"fib_50{suffix}": swing_high - 0.5 * price_range,
+                f"fib_38_2{suffix}": swing_high - 0.382 * price_range,
+                f"fib_23_6{suffix}": swing_high - 0.236 * price_range,
+                f"fib_0{suffix}": swing_high,
+            }
+
+        # Add metadata about swings
+        fib_levels[f"swing_high_val{suffix}"] = swing_high
+        fib_levels[f"swing_low_val{suffix}"] = swing_low
+        fib_levels[f"trend{suffix}"] = "Uptrend" if is_uptrend else "Downtrend"
+
+        # Store the latest valid Fibonacci levels for future reference
+        prev_fib_levels = fib_levels.copy()
+
+        # Assign values to each row up to the current row
+        df.loc[recent_low_idx:current_idx, list(fib_levels.keys())] = list(
+            fib_levels.values()
+        )
     return df
