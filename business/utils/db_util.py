@@ -3,6 +3,7 @@ import pandas as pd
 from dotenv import load_dotenv
 import os
 import csv
+from psycopg2.extras import execute_values
 
 load_dotenv()
 
@@ -21,35 +22,48 @@ def create_table(table_name, columns):
     conn = _create_connection()
     cur = conn.cursor()
     create_table_query = f"""
-        CREATE TABLE IF NOT EXISTS {table_name} (
+        CREATE TABLE IF NOT EXISTS "{table_name}" (
             {", ".join(columns)}
         );
     """
-
     cur.execute(create_table_query)
     conn.commit()
-
     cur.close()
     conn.close()
 
 
-def load_dataframe_to_database(df, table_name):
+def load_dataframe_to_database(df, table_name, batch_size=1000):
+    """
+    Bulk inserts rows from a DataFrame into the given table in batches.
+    Uses ON CONFLICT (timestamp) DO NOTHING to skip rows violating the unique constraint.
+    """
     conn = _create_connection()
     cur = conn.cursor()
 
     columns = df.columns.tolist()
-    insert_query = f"""
-        INSERT INTO {table_name} ({", ".join(columns)}) VALUES ({", ".join(["%s"] * len(columns))});
-    """
-    #insert_query = f"INSERT INTO {table_name} ({', '.join(columns)}) VALUES ({', '.join(['?'] * len(columns))})"
+    # Quote each column name (assuming your columns might have special characters)
+    quoted_columns = [f'"{col}"' for col in columns]
+    # Build the insert query.
+    # Assumes that the "timestamp" column has a unique constraint.
+    insert_query = (
+        f"INSERT INTO \"{table_name}\" ({', '.join(quoted_columns)}) VALUES %s "
+        f'ON CONFLICT ("timestamp") DO NOTHING'
+    )
 
-    for index, row in df.iterrows():
-        cur.execute(insert_query, row.values)
+    # Convert DataFrame rows to a list of tuples.
+    values = [tuple(row) for row in df.to_numpy()]
 
-    conn.commit()
-
+    for i in range(0, len(values), batch_size):
+        batch = values[i : i + batch_size]
+        try:
+            execute_values(cur, insert_query, batch)
+            conn.commit()  # Commit each batch
+        except Exception as e:
+            conn.rollback()
+            print(f"Error during bulk insert batch starting at index {i}: {e}")
     cur.close()
     conn.close()
+
 
 def insert_data_to_table(table_name, data):
     conn = _create_connection()
@@ -67,12 +81,11 @@ def insert_data_to_table(table_name, data):
 
     cur.close()
     conn.close()
-    
-    
-    
+
+
 def check_table_existance(table_name):
     try:
-        conn = _create_connection() 
+        conn = _create_connection()
         cursor = conn.cursor()
 
         select_query = f"""
@@ -92,9 +105,12 @@ def check_table_existance(table_name):
         if conn:
             conn.close()
 
+
 def select_from_table(table_name, where_condition):
     try:
-        conn = _create_connection()  # Assuming _create_connection is a separate function
+        conn = (
+            _create_connection()
+        )  # Assuming _create_connection is a separate function
         cursor = conn.cursor()
 
         select_query = f"""
@@ -118,19 +134,20 @@ def select_from_table(table_name, where_condition):
     finally:
         if conn:
             conn.close()
-    
-    
+
+
 def update_data_in_db(self, table_name, set_values, where_condition):
-        conn = _create_connection()
-        cursor = conn.cursor()
-        update_query = f"""
+    conn = _create_connection()
+    cursor = conn.cursor()
+    update_query = f"""
         UPDATE {table_name}
         SET {set_values}
         WHERE {where_condition}
         """
-        self.__update_data(conn, table_name, where_condition=where_condition)
+    self.__update_data(conn, table_name, where_condition=where_condition)
 
-        conn.close()
+    conn.close()
+
 
 def delete_table(table_name):
     conn = _create_connection()
@@ -143,7 +160,8 @@ def delete_table(table_name):
     cursor.execute(delete_query)
     conn.commit()
     conn.close()
-    
+
+
 def delete_data_from_table(table_name, where_condition):
     conn = _create_connection()
     cursor = conn.cursor()
@@ -156,6 +174,7 @@ def delete_data_from_table(table_name, where_condition):
     cursor.execute(delete_query)
     conn.commit()
     conn.close()
+
 
 # conn = psycopg2.connect(
 #    host="localhost",
@@ -183,3 +202,32 @@ def delete_data_from_table(table_name, where_condition):
 # conn.commit()
 # cur.close()
 # conn.close()
+
+
+def add_unique_constraint(table_name, column):
+    """
+    Adds a unique constraint to the specified column in the given table.
+
+    Parameters:
+      table_name (str): The name of the table.
+      column (str): The column to be made unique.
+    """
+    conn = _create_connection()
+    cur = conn.cursor()
+    constraint_name = f"{table_name}_{column}_unique"
+    query = f'ALTER TABLE "{table_name}" ADD CONSTRAINT "{constraint_name}" UNIQUE ("{column}");'
+
+    try:
+        cur.execute(query)
+        conn.commit()
+        print(
+            f"Unique constraint '{constraint_name}' added on column '{column}' in table '{table_name}'."
+        )
+    except Exception as e:
+        conn.rollback()
+        print(
+            f"Error adding unique constraint on column '{column}' for table '{table_name}': {e}"
+        )
+    finally:
+        cur.close()
+        conn.close()
